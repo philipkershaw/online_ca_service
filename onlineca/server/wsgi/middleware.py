@@ -5,7 +5,7 @@ NERC MashMyData Project
 """
 __author__ = "P J Kershaw"
 __date__ = "24/05/10"
-__copyright__ = "(C) 2010 Science and Technology Facilities Council"
+__copyright__ = "(C) 2012 Science and Technology Facilities Council"
 __license__ = "BSD - see LICENSE file in top-level directory"
 __contact__ = "Philip.Kershaw@stfc.ac.uk"
 __revision__ = "$Id$"
@@ -20,17 +20,14 @@ import traceback
 from webob import Request
 from OpenSSL import crypto
 
-from myproxy.client import MyProxyClient, MyProxyClientError
-from myproxy.server.wsgi.middleware import (MyProxyClientMiddlewareBase, 
-                                            MyProxyClientMiddleware)
-from myproxy.ws.server.wsgi.httpbasicauth import HttpBasicAuthResponseException
+from onlineca.server.wsgi.httpbasicauth import HttpBasicAuthResponseException
 
 
-class MyProxyLogonWSMiddlewareError(Exception):
+class OnlineCaMiddlewareError(Exception):
     """Errors related to the MyProxy Web Service middleware"""
 
 
-class MyProxyLogonWSMiddleware(MyProxyClientMiddleware):
+class OnlineCaMiddleware(object):
     """Build on MyClientMiddleware to expose a special logon Web Service method
     
     TODO: possible refactor to NOT inherit from MyProxyClientMiddleware but 
@@ -80,11 +77,11 @@ class MyProxyLogonWSMiddleware(MyProxyClientMiddleware):
         @type app: function
         @param app: WSGI callable for next application in stack
         '''
-        super(MyProxyLogonWSMiddleware, self).__init__(app)
+        super(OnlineCaMiddleware, self).__init__(app)
         self.__logonFuncEnvironKeyName = None
         self.__global_passwd = None  
           
-    def parseConfig(self, prefix=PARAM_PREFIX, myProxyClientPrefix=None,
+    def parse_config(self, prefix=PARAM_PREFIX, myProxyClientPrefix=None,
                     **app_conf):
         """Parse dictionary of configuration items updating the relevant 
         attributes of this instance
@@ -100,7 +97,7 @@ class MyProxyLogonWSMiddleware(MyProxyClientMiddleware):
         """
         
         # Call parent version
-        super(MyProxyLogonWSMiddleware, self).parseConfig(prefix=prefix, 
+        super(OnlineCaMiddleware, self).parse_config(prefix=prefix, 
                             myProxyClientPrefix=myProxyClientPrefix, **app_conf)  
             
         # Extract additional parameters
@@ -148,7 +145,7 @@ class MyProxyLogonWSMiddleware(MyProxyClientMiddleware):
         log.debug("MyProxyClientMiddleware.__call__ ...")
         environ[self.logonFuncEnvironKeyName] = self.myProxyLogon
         
-        return super(MyProxyLogonWSMiddleware, self).__call__(environ, 
+        return super(OnlineCaMiddleware, self).__call__(environ, 
                                                               start_response)
         
     @property
@@ -237,7 +234,7 @@ class MyProxyLogonWSMiddleware(MyProxyClientMiddleware):
                 raise HttpBasicAuthResponseException(str(e),
                                                      httplib.UNAUTHORIZED)
             except socket.error, e:
-                raise MyProxyLogonWSMiddlewareError("Socket error "
+                raise OnlineCaMiddlewareError("Socket error "
                                         "with MyProxy server %r: %s" % 
                                         (self.myProxyClient.hostname, e))
             except Exception, e:
@@ -250,11 +247,11 @@ class MyProxyLogonWSMiddleware(MyProxyClientMiddleware):
         return _myProxylogon
     
     
-class MyProxyGetTrustRootsMiddlewareError(Exception):
-    """MyProxyGetTrustRootsMiddleware exception class"""
+class OnlineCaGetTrustRootsMiddlewareError(Exception):
+    """OnlineCaGetTrustRootsMiddleware exception class"""
     
     
-class MyProxyGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
+class OnlineCaGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
     """HTTP client interface for MyProxy server Get Trust Roots method
     
     It relies on a myproxy.server.wsgi.MyProxyClientMiddleware instance called 
@@ -290,7 +287,7 @@ class MyProxyGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
         @type app: function
         @param app: WSGI callable for next application in stack
         '''
-        super(MyProxyGetTrustRootsMiddleware, self).__init__(app)
+        super(OnlineCaGetTrustRootsMiddleware, self).__init__(app)
         self.__path = None
         
     @classmethod
@@ -308,14 +305,14 @@ class MyProxyGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
         @param app_conf: PasteDeploy application specific configuration 
         dictionary
         
-        @rtype: myproxy.server.wsgi.middleware.MyProxyGetTrustRootsMiddleware
+        @rtype: myproxy.server.wsgi.middleware.OnlineCaGetTrustRootsMiddleware
         @return: an instance of this middleware
         """
         app = cls(app)
-        app.parseConfig(prefix=prefix, **app_conf)
+        app.parse_config(prefix=prefix, **app_conf)
         return app
     
-    def parseConfig(self, prefix=PARAM_PREFIX, **app_conf):
+    def parse_config(self, prefix=PARAM_PREFIX, **app_conf):
         """Parse dictionary of configuration items updating the relevant 
         attributes of this instance
         
@@ -373,7 +370,7 @@ class MyProxyGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
         if environ['PATH_INFO'] != self.path:
             return self.app(environ, start_response)
         
-        log.debug("MyProxyGetTrustRootsMiddleware.__call__ ...")
+        log.debug("OnlineCaGetTrustRootsMiddleware.__call__ ...")
         
         # Check method
         requestMethod = environ.get('REQUEST_METHOD')             
@@ -411,7 +408,7 @@ class MyProxyGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
         
         @rtype: basestring
         @return: trust roots base64 encoded and concatenated together
-        @raise MyProxyGetTrustRootsMiddlewareError: socket error with backend
+        @raise OnlineCaGetTrustRootsMiddlewareError: socket error with backend
         MyProxy server
         @raise MyProxyClientError: error response received by MyProxyClient
         instance
@@ -433,7 +430,7 @@ class MyProxyGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
             raise
             
         except socket.error, e:
-            raise MyProxyGetTrustRootsMiddlewareError("Socket error with "
+            raise OnlineCaGetTrustRootsMiddlewareError("Socket error with "
                                                       "MyProxy server %r: %s" % 
                                                       (myProxyClient.hostname, 
                                                        e))
