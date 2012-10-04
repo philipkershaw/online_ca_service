@@ -13,13 +13,14 @@ import logging
 log = logging.getLogger(__name__)
 
 import httplib
-import socket
+import os
 import base64
-import traceback
 
 from webob import Request
 from OpenSSL import crypto
 
+from onlineca.server.interfaces import OnlineCaInterface
+from onlineca.server.factory import call_module_object
 from onlineca.server.wsgi.httpbasicauth import HttpBasicAuthResponseException
 
 
@@ -28,48 +29,48 @@ class OnlineCaMiddlewareError(Exception):
 
 
 class OnlineCaMiddleware(object):
-    """Build on MyClientMiddleware to expose a special logon Web Service method
+    """Web service interface for issuing certificates and providing CA trust 
+    roots
     
-    TODO: possible refactor to NOT inherit from MyProxyClientMiddleware but 
-    instead receive a MyProxyClient instance via environ set from an upstream 
-    MyProxyClientMiddleware object
+    @cvar CA_CLASS_FACTORY_OPTNAME: config file option name for Python path to function 
+    or class constructor to make a CA instance.  CA instance must implement CA 
+    interface class as defined in the interfaces module - 
+    onlineca.server.interfaces import OnlineCaInterface
+    @type CA_CLASS_FACTORY_OPTNAME: string
     
-    @cvar LOGON_FUNC_ENV_KEYNAME_OPTNAME: ini file option name to set the key 
-    name in WSGI environ dict to assign to the Logon function created by this
-    middleware
-    @type LOGON_FUNC_ENV_KEYNAME_OPTNAME: string
-    
-    @cvar DEFAULT_LOGON_FUNC_ENV_KEYNAME: default value for the key name in 
+    @cvar DEFAULT_CA_CLASS_FACTORY: default value for the key name in 
     WSGI environ dict to assign to the Logon function created by this
     middleware
-    @type DEFAULT_LOGON_FUNC_ENV_KEYNAME: string
+    @type DEFAULT_CA_CLASS_FACTORY: string
     
     @cvar CERT_REQ_POST_PARAM_KEYNAME: HTTP POST field name for the 
     certificate request posted in logon calls
     @type CERT_REQ_POST_PARAM_KEYNAME: string
     
-    @ivar __logonFuncEnvironKeyName: 
-    @type __logonFuncEnvironKeyName: string
+    @ivar __ca_class_factory_path: 
+    @type __ca_class_factory_path: string
     
     @cvar PARAM_PREFIX: prefix for ini file option names 
     @type PARAM_PREFIX: string
     """
     
     # Options for ini file
-    LOGON_FUNC_ENV_KEYNAME_OPTNAME = 'logonFuncEnvKeyName'
-    DEFAULT_GLOBAL_PASSWD_OPTNAME = 'global_passwd'
+    CA_CLASS_FACTORY_OPTNAME = 'ca_class_factory_path'
 
     # Default environ key names
-    DEFAULT_LOGON_FUNC_ENV_KEYNAME = ('myproxy.server.wsgi.middleware.'
-                                      'MyProxyClientMiddleware.logon')
+    DEFAULT_CA_CLASS_FACTORY = 'ca.impl.CertificateAuthority'
     
     CERT_REQ_POST_PARAM_KEYNAME = 'certificate_request'
     
     __slots__ = (
-        '__logonFuncEnvironKeyName', 
-        '__global_passwd'
+        '__ca',
+        '__ca_class_factory_path',
+        '__issue_cert_path',
+        '__trustroots_path',
+        '__trustroots_dir'
     )
-    PARAM_PREFIX = 'myproxy.ws.server.logon.'
+    PARAM_PREFIX = 'onlineca.server.'
+    CA_PARAM_PREFIX = CA_CLASS_FACTORY_OPTNAME + '.'
     
     def __init__(self, app):
         '''Create attributes
@@ -77,12 +78,14 @@ class OnlineCaMiddleware(object):
         @type app: function
         @param app: WSGI callable for next application in stack
         '''
-        super(OnlineCaMiddleware, self).__init__(app)
-        self.__logonFuncEnvironKeyName = None
-        self.__global_passwd = None  
+        self._app = None
+        self.__ca_class_factory_path = None
+        self.__issue_cert_path = None
+        self.__trustroots_path = None
+        self.__ca = None
           
-    def parse_config(self, prefix=PARAM_PREFIX, myProxyClientPrefix=None,
-                    **app_conf):
+    def parse_config(self, prefix=PARAM_PREFIX, ca_prefix=CA_PARAM_PREFIX,
+                     **app_conf):
         """Parse dictionary of configuration items updating the relevant 
         attributes of this instance
         
@@ -96,248 +99,56 @@ class OnlineCaMiddleware(object):
         dictionary
         """
         
-        # Call parent version
-        super(OnlineCaMiddleware, self).parse_config(prefix=prefix, 
-                            myProxyClientPrefix=myProxyClientPrefix, **app_conf)  
-            
         # Extract additional parameters
-        logonFuncEnvKeyOptName = prefix + \
-                        self.__class__.LOGON_FUNC_ENV_KEYNAME_OPTNAME
+        cls = self.__class__
+        ca_class_factory_path_optname = prefix + cls.CA_CLASS_FACTORY_OPTNAME
 
-        self.logonFuncEnvironKeyName = app_conf.get(logonFuncEnvKeyOptName,
-                        self.__class__.DEFAULT_LOGON_FUNC_ENV_KEYNAME)
+        self.ca_class_factory_path = app_conf.get(ca_class_factory_path_optname,
+                                                  cls.DEFAULT_CA_CLASS_FACTORY)
         
-        global_passwd_optname = prefix + \
-                        self.__class__.DEFAULT_GLOBAL_PASSWD_OPTNAME
-                        
-        self.__global_passwd = app_conf.get(global_passwd_optname)
-
+        ca_opt_prefix = prefix + ca_prefix
+        ca_opt_offset = len(ca_opt_prefix)
+        ca_opt = {}
+        for optname, optval in app_conf.items():
+            if optname.startswith(ca_opt_prefix):
+                ca_optname = optname[ca_opt_offset:]
+                ca_opt[ca_optname] = optval
+                
+        self.instantiate_ca(**ca_opt)
+        
+    def instantiate_ca(self, **ca_object_kwargs):
+        '''Create CA class instance
+        @param ca_object_kwargs: keywords to CA class constructor
+        '''
+        self.__ca = call_module_object(self.ca_class_factory_path, 
+                                       object_properties=ca_object_kwargs)
+        if not isinstance(self.__ca, OnlineCaInterface):
+            raise TypeError('%r CA class factory must return a %r derived '
+                            'type' % (self.ca_class_factory_path, 
+                                      type(OnlineCaInterface)))
+        
     @property
-    def logonFuncEnvironKeyName(self):
-        """Get MyProxyClient logon function environ key name
-        
-        @rtype: basestring
-        @return: MyProxyClient logon function environ key name
-        """
-        return self.__logonFuncEnvironKeyName
+    def ca_class_factory_path(self):
+        return self.__ca_class_factory_path
 
-    @logonFuncEnvironKeyName.setter
-    def logonFuncEnvironKeyName(self, value):
-        """Set MyProxyClient environ key name
-        
-        @type value: basestring
-        @param value: MyProxyClient logon function environ key name
-        """
+    @ca_class_factory_path.setter
+    def ca_class_factory_path(self, value):
         if not isinstance(value, basestring):
-            raise TypeError('Expecting string type for '
-                            '"logonFuncEnvironKeyName"; got %r type' % 
-                            type(value))
-        self.__logonFuncEnvironKeyName = value
-    
-    def __call__(self, environ, start_response):
-        '''Set MyProxy logon method in environ
-        
-        @type environ: dict
-        @param environ: WSGI environment variables dictionary
-        @type start_response: function
-        @param start_response: standard WSGI start response function
-        '''
-        log.debug("MyProxyClientMiddleware.__call__ ...")
-        environ[self.logonFuncEnvironKeyName] = self.myProxyLogon
-        
-        return super(OnlineCaMiddleware, self).__call__(environ, 
-                                                              start_response)
-        
+            raise TypeError('Expecting string type for "ca_class_factory_path"'
+                            '; got %r type' % type(value))
+            
+        self.__ca_class_factory_path = value
+
     @property
-    def myProxyLogon(self):
-        """Return the MyProxy logon method wrapped as a HTTP Basic Auth 
-        authenticate interface function
-        
-        @rtype: function
-        @return: MyProxy logon HTTP Basic Auth Callback
-        """
-        def _myProxylogon(environ, start_response, username, password):
-            """Wrap MyProxy logon method as a WSGI app
-            @type environ: dict
-            @param environ: WSGI environment variables dictionary
-            @type start_response: function
-            @param start_response: standard WSGI start response function
-            @type username: basestring
-            @param username: username credential to MyProxy logon
-            @type password: basestring
-            @param password: pass-phrase for MyProxy logon call
-            @raise HttpBasicAuthResponseException: invalid client request
-            @raise MyProxyClientMiddlewareError: socket error for backend
-            MyProxy server
-            """  
-            request = Request(environ)
-            
-            requestMethod = environ.get('REQUEST_METHOD')                         
-            if requestMethod != 'POST':
-                response = "HTTP Request method not recognised"
-                log.error("HTTP Request method %r not recognised", 
-                          requestMethod)
-                raise HttpBasicAuthResponseException(response, 
-                                                     httplib.METHOD_NOT_ALLOWED)
-                
-            # Extract cert request and convert to standard string - SSL library
-            # will not accept unicode
-            cert_req_key = self.__class__.CERT_REQ_POST_PARAM_KEYNAME
-            pem_cert_req = str(request.POST.get(cert_req_key))
-            if pem_cert_req is None:
-                response = ("No %r form variable set in POST message" % 
-                            cert_req_key)
-                log.error(response)
-                raise HttpBasicAuthResponseException(response, 
-                                                     httplib.BAD_REQUEST)
-        
-            log.debug("cert req = %r", pem_cert_req)
-            
-            # Expecting PEM encoded request
-            try:
-                cert_req = crypto.load_certificate_request(crypto.FILETYPE_PEM,
-                                                           pem_cert_req)
-            except crypto.Error, e:
-                log.error("Error loading input certificate request: %r", 
-                          pem_cert_req)
-                raise HttpBasicAuthResponseException("Error loading input "
-                                                     "certificate request",
-                                                     httplib.BAD_REQUEST)
-            
-            # Convert to ASN1 format expect by logon client call
-            asn1CertReq = crypto.dump_certificate_request(crypto.FILETYPE_ASN1, 
-                                                          cert_req)
-
-            # A global password can be set for the MyProxy call.  This is used
-            # for the special case where this service is providing delegation
-            # The MyProxyCA uses a special PAM with a single password set for
-            # all usernames.  Clients to this service must be protected by
-            # SSL client authentication
-            if self.__global_passwd is not None:
-                password_ = self.__global_passwd
-            else:
-                password_ = password
-                
-            try:
-                credentials = self.myProxyClient.logon(username, 
-                                                       password_,
-                                                       certReq=asn1CertReq)
-                status = self.getStatusMessage(httplib.OK)
-                response = '\n'.join(credentials)
-                
-                start_response(status,
-                               [('Content-length', str(len(response))),
-                                ('Content-type', 'text/plain')])
-                return [response]
-                       
-            except MyProxyClientError, e:
-                raise HttpBasicAuthResponseException(str(e),
-                                                     httplib.UNAUTHORIZED)
-            except socket.error, e:
-                raise OnlineCaMiddlewareError("Socket error "
-                                        "with MyProxy server %r: %s" % 
-                                        (self.myProxyClient.hostname, e))
-            except Exception, e:
-                log.error("MyProxyClient.logon raised an unknown exception "
-                          "calling %r: %s", 
-                          self.myProxyClient.hostname,
-                          traceback.format_exc())
-                raise # Trigger 500 Internal Server Error
-            
-        return _myProxylogon
-    
-    
-class OnlineCaGetTrustRootsMiddlewareError(Exception):
-    """OnlineCaGetTrustRootsMiddleware exception class"""
-    
-    
-class OnlineCaGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
-    """HTTP client interface for MyProxy server Get Trust Roots method
-    
-    It relies on a myproxy.server.wsgi.MyProxyClientMiddleware instance called 
-    upstream in the WSGI stack to set up a MyProxyClient instance and make it 
-    available in the environ to call its getTrustRoots method.
-    
-    @cvar PATH_OPTNAME: ini file option to set the URI path for this service
-    @type PATH_OPTNAME: string
-    
-    @cvar DEFAULT_PATH: default URI path setting
-    @type DEFAULT_PATH: string
-
-    @cvar PARAM_PREFIX: prefix for ini file option names 
-    @type PARAM_PREFIX: string
-    
-    @ivar __path: URI path setting for this service
-    @type __path: basestring
-    """
-        
-    PATH_OPTNAME = 'path'     
-    DEFAULT_PATH = '/myproxy/get-trustroots'
-    
-    # Option prefixes
-    PARAM_PREFIX = 'myproxy.getTrustRoots.'
-    
-    __slots__ = (
-        '__path',
-    )
-    
-    def __init__(self, app):
-        '''Create attributes
-        
-        @type app: function
-        @param app: WSGI callable for next application in stack
-        '''
-        super(OnlineCaGetTrustRootsMiddleware, self).__init__(app)
-        self.__path = None
-        
-    @classmethod
-    def filter_app_factory(cls, app, global_conf, prefix=PARAM_PREFIX, 
-                           **app_conf):
-        """Function following Paste filter app factory signature
-        
-        @type app: callable following WSGI interface
-        @param app: next middleware/application in the chain      
-        @type global_conf: dict        
-        @param global_conf: PasteDeploy global configuration dictionary
-        @type prefix: basestring
-        @param prefix: prefix for configuration items
-        @type app_conf: dict        
-        @param app_conf: PasteDeploy application specific configuration 
-        dictionary
-        
-        @rtype: myproxy.server.wsgi.middleware.OnlineCaGetTrustRootsMiddleware
-        @return: an instance of this middleware
-        """
-        app = cls(app)
-        app.parse_config(prefix=prefix, **app_conf)
-        return app
-    
-    def parse_config(self, prefix=PARAM_PREFIX, **app_conf):
-        """Parse dictionary of configuration items updating the relevant 
-        attributes of this instance
-        
-        @type prefix: basestring
-        @param prefix: prefix for configuration items
-        @type app_conf: dict        
-        @param app_conf: PasteDeploy application specific configuration 
-        dictionary
-        """
-        clientEnvKeyOptName = prefix + self.__class__.CLIENT_ENV_KEYNAME_OPTNAME
-                    
-        self.clientEnvironKeyName = app_conf.get(clientEnvKeyOptName,
-                                    self.__class__.DEFAULT_CLIENT_ENV_KEYNAME)
-        
-        pathOptName = prefix + self.__class__.PATH_OPTNAME
-        self.path = app_conf.get(pathOptName, self.__class__.DEFAULT_PATH)
-
-    def _getPath(self):
+    def issue_cert_path(self):
         """Get URI path for get trust roots method
         @rtype: basestring
         @return: path for get trust roots method
         """
-        return self.__path
+        return self.__issue_cert_path
 
-    def _setPath(self, value):
+    @issue_cert_path.setter
+    def issue_cert_path(self, value):
         """Set URI path for get trust roots method
         @type value: basestring
         @param value: path for get trust roots method
@@ -346,98 +157,116 @@ class OnlineCaGetTrustRootsMiddleware(MyProxyClientMiddlewareBase):
             raise TypeError('Expecting string type for "path"; got %r' % 
                             type(value))
         
-        self.__path = value
+        self.__issue_cert_path = value
 
-    path = property(fget=_getPath, fset=_setPath, 
-                    doc="environ SCRIPT_NAME path which invokes the "
-                        "getTrustRoots method on this middleware")
-    
-    def __call__(self, environ, start_response):
-        '''Get MyProxyClient instance from environ and call MyProxy 
-        getTrustRoots method returning the response.
+    @property
+    def trustroots_path(self):
+        """Get URI path for get trust roots method
+        @rtype: basestring
+        @return: path for get trust roots method
+        """
+        return self.__trustroots_path
+
+    @trustroots_path.setter
+    def trustroots_path(self, value):
+        """trust roots path
+        """
+        if not isinstance(value, basestring):
+            raise TypeError('Expecting string type for "path"; got %r' % 
+                            type(value))
         
-        MyProxyClientMiddleware must be in place upstream in the WSGI stack
+        self.__trustroots_path = value 
+
+    @property
+    def trustroots_dir(self):
+        """Get trust roots dir
+        """
+        return self.__trustroots_dir
+
+    @trustroots_dir.setter
+    def trustroots_dir(self, value):
+        """trust roots dir
+        """
+        if not isinstance(value, basestring):
+            raise TypeError('Expecting string type for "path"; got %r' % 
+                            type(value))
+        
+        self.__trustroots_dir = value 
+                   
+    def __call__(self, environ, start_response):
+        '''Set MyProxy logon method in environ
         
         @type environ: dict
         @param environ: WSGI environment variables dictionary
         @type start_response: function
         @param start_response: standard WSGI start response function
-        
-        @rtype: list
-        @return: get trust roots response
         '''
-        # Skip if path doesn't match
-        if environ['PATH_INFO'] != self.path:
-            return self.app(environ, start_response)
-        
-        log.debug("OnlineCaGetTrustRootsMiddleware.__call__ ...")
-        
-        # Check method
-        requestMethod = environ.get('REQUEST_METHOD')             
-        if requestMethod != 'GET':
-            response = "HTTP Request method not recognised"
-            log.error("HTTP Request method %r not recognised", requestMethod)
-            status = self.__class__.getStatusMessage(httplib.BAD_REQUEST)
-            start_response(status,
-                           [('Content-type', 'text/plain'),
-                            ('Content-length', str(len(response)))])
-            return [response]
-        
-        myProxyClient = environ[self.clientEnvironKeyName]
-        if not isinstance(myProxyClient, MyProxyClient):
-            raise TypeError('Expecting %r type for "myProxyClient" environ[%r] '
-                            'attribute got %r' % (MyProxyClient, 
-                                                  self.clientEnvironKeyName,
-                                                  type(myProxyClient)))
-        
-        response = self._getTrustRoots(myProxyClient)
-        start_response(self.getStatusMessage(httplib.OK),
+        log.debug("OnlineCaMiddleware.__call__ ...")
+
+        path_info = environ['PATH_INFO']
+        if path_info == self.__issue_cert_path:
+            response = self._issue_certificate(environ)
+                   
+        elif path_info == self.__trustroots_path:
+            response = self._get_trustroots()
+            
+        else:              
+            return self._app(environ, start_response)
+            
+        start_response('200 OK',
                        [('Content-length', str(len(response))),
                         ('Content-type', 'text/plain')])
-
         return [response]
+            
+    def _issue_certificate(self, environ):
+        request = Request(environ)
+        
+        request_method = environ.get('REQUEST_METHOD')                         
+        if request_method != 'POST':
+            response = "HTTP Request method not recognised"
+            log.error("HTTP Request method %r not recognised", request_method)
+            raise HttpBasicAuthResponseException(response, 
+                                                 httplib.METHOD_NOT_ALLOWED)
+            
+        # Extract cert request and convert to standard string - SSL library
+        # will not accept unicode
+        cert_req_key = self.__class__.CERT_REQ_POST_PARAM_KEYNAME
+        pem_cert_req = str(request.POST.get(cert_req_key))
+        if pem_cert_req is None:
+            response = ("No %r form variable set in POST message" % 
+                        cert_req_key)
+            log.error(response)
+            raise HttpBasicAuthResponseException(response, 
+                                                 httplib.BAD_REQUEST)
     
-    @classmethod
-    def _getTrustRoots(cls, myProxyClient):
+        log.debug("certificate request = %r", pem_cert_req)
+        
+        # Expecting PEM encoded request
+        try:
+            cert_req = crypto.load_certificate_request(crypto.FILETYPE_PEM,
+                                                       pem_cert_req)
+        except crypto.Error:
+            log.error("Error loading input certificate request: %r", 
+                      pem_cert_req)
+            raise HttpBasicAuthResponseException("Error loading input "
+                                                 "certificate request",
+                                                 httplib.BAD_REQUEST)
+            
+        cert = self.__ca.issue_certificate(cert_req)
+        return cert
+
+    def _get_trustroots(self):
         """Call getTrustRoots method on MyProxyClient instance retrieved from
         environ and format and return a HTTP response
         
-        @type myProxyClient: myproxy.client.MyProxyClient
-        @param myProxyClient: MyProxyClient instance on which to call 
-        getTrustRoots method
-        
         @rtype: basestring
         @return: trust roots base64 encoded and concatenated together
-        @raise OnlineCaGetTrustRootsMiddlewareError: socket error with backend
-        MyProxy server
-        @raise MyProxyClientError: error response received by MyProxyClient
-        instance
         """
-        try:
-            trustRoots = myProxyClient.getTrustRoots()
+        trust_roots = ''
+        for filename in os.listdir(self.trustroots_dir):
+            file_content = open(filename).read()
             
-            # Serialise dict response
-            response = "\n".join(["%s=%s" % (k, base64.b64encode(v))
-                                  for k,v in trustRoots.items()])
-            
-            return response
-                   
-        except MyProxyClientError, e:
-            log.error("MyProxyClient.getTrustRoots raised an "
-                      "MyProxyClientError exception calling %r: %s", 
-                      myProxyClient.hostname,
-                      traceback.format_exc())
-            raise
-            
-        except socket.error, e:
-            raise OnlineCaGetTrustRootsMiddlewareError("Socket error with "
-                                                      "MyProxy server %r: %s" % 
-                                                      (myProxyClient.hostname, 
-                                                       e))
-        except Exception, e:
-            log.error("MyProxyClient.getTrustRoots raised an unknown exception "
-                      "calling %r: %s", 
-                      myProxyClient.hostname,
-                      traceback.format_exc())
-            raise # Trigger 500 Internal Server Error
-       
+            trust_roots += "%s=%s\n" % (filename, 
+                                        base64.b64encode(file_content))
+        
+        return trust_roots
