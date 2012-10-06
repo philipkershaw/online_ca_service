@@ -12,16 +12,15 @@ __revision__ = "$Id$"
 import logging
 log = logging.getLogger(__name__)
 
-import httplib
 import os
 import base64
 
 from webob import Request
+from paste.httpexceptions import HTTPMethodNotAllowed, HTTPBadRequest
 from OpenSSL import crypto
 
 from onlineca.server.interfaces import OnlineCaInterface
 from onlineca.server.factory import call_module_object
-from onlineca.server.wsgi.httpbasicauth import HttpBasicAuthResponseException
 
 
 class OnlineCaMiddlewareError(Exception):
@@ -83,7 +82,15 @@ class OnlineCaMiddleware(object):
         self.__issue_cert_path = None
         self.__trustroots_path = None
         self.__ca = None
-          
+        
+    @classmethod
+    def filter_app_factory(cls, app, global_conf, prefix=PARAM_PREFIX, 
+                           **app_conf):
+        obj = cls(app)
+        obj.parse_config(prefix=prefix, **app_conf)
+        
+        return obj
+     
     def parse_config(self, prefix=PARAM_PREFIX, ca_prefix=CA_PARAM_PREFIX,
                      **app_conf):
         """Parse dictionary of configuration items updating the relevant 
@@ -202,10 +209,10 @@ class OnlineCaMiddleware(object):
         @param start_response: standard WSGI start response function
         '''
         log.debug("OnlineCaMiddleware.__call__ ...")
-
+        request = Request(environ)
         path_info = environ['PATH_INFO']
         if path_info == self.__issue_cert_path:
-            response = self._issue_certificate(environ)
+            response = self._issue_certificate(request)
                    
         elif path_info == self.__trustroots_path:
             response = self._get_trustroots()
@@ -218,15 +225,14 @@ class OnlineCaMiddleware(object):
                         ('Content-type', 'text/plain')])
         return [response]
             
-    def _issue_certificate(self, environ):
-        request = Request(environ)
+    def _issue_certificate(self, request):
+        '''Issue a new certificate from the Certificate Signing Request passed
+        in the POST'd request'''
         
-        request_method = environ.get('REQUEST_METHOD')                         
-        if request_method != 'POST':
+        if request.method != 'POST':
             response = "HTTP Request method not recognised"
-            log.error("HTTP Request method %r not recognised", request_method)
-            raise HttpBasicAuthResponseException(response, 
-                                                 httplib.METHOD_NOT_ALLOWED)
+            log.error("HTTP Request method %r not recognised", request.method)
+            raise HTTPMethodNotAllowed(response)
             
         # Extract cert request and convert to standard string - SSL library
         # will not accept unicode
@@ -236,8 +242,7 @@ class OnlineCaMiddleware(object):
             response = ("No %r form variable set in POST message" % 
                         cert_req_key)
             log.error(response)
-            raise HttpBasicAuthResponseException(response, 
-                                                 httplib.BAD_REQUEST)
+            raise HTTPBadRequest(response)
     
         log.debug("certificate request = %r", pem_cert_req)
         
@@ -248,24 +253,26 @@ class OnlineCaMiddleware(object):
         except crypto.Error:
             log.error("Error loading input certificate request: %r", 
                       pem_cert_req)
-            raise HttpBasicAuthResponseException("Error loading input "
-                                                 "certificate request",
-                                                 httplib.BAD_REQUEST)
+            raise HTTPBadRequest("Error loading input certificate request")
             
         cert = self.__ca.issue_certificate(cert_req)
         return cert
 
-    def _get_trustroots(self):
+    def _get_trustroots(self, request):
         """Call getTrustRoots method on MyProxyClient instance retrieved from
         environ and format and return a HTTP response
         
         @rtype: basestring
         @return: trust roots base64 encoded and concatenated together
         """
+        if request.method != 'POST':
+            response = "HTTP Request method not recognised"
+            log.error("HTTP Request method %r not recognised", request.method)
+            raise HTTPMethodNotAllowed(response)
+            
         trust_roots = ''
         for filename in os.listdir(self.trustroots_dir):
-            file_content = open(filename).read()
-            
+            file_content = open(filename).read()            
             trust_roots += "%s=%s\n" % (filename, 
                                         base64.b64encode(file_content))
         
