@@ -46,10 +46,18 @@ class OnlineCaMiddleware(object):
     certificate request posted in logon calls
     @type CERT_REQ_POST_PARAM_KEYNAME: string
     
-    @ivar DEFAULT_ISSUE_CERT_URIPATH: 
+    @ivar ISSUE_CERT_URIPATH_OPTNAME: ini file option name for issue cert URI
+    path parameter
+    @type ISSUE_CERT_URIPATH_OPTNAME: string
+    
+    @ivar DEFAULT_ISSUE_CERT_URIPATH: URI sub-path for issue cert call
     @type DEFAULT_ISSUE_CERT_URIPATH: string
     
-    @ivar DEFAULT_TRUSTROOTS_URIPATH: 
+    @ivar TRUSTROOTS_URIPATH_OPTNAME: ini file option name for trustroots URI
+    path parameter
+    @type TRUSTROOTS_URIPATH_OPTNAME: string
+    
+    @ivar DEFAULT_TRUSTROOTS_URIPATH: URI sub-path for get trustroots call
     @type DEFAULT_TRUSTROOTS_URIPATH: string
     
     @cvar PARAM_PREFIX: prefix for ini file option names 
@@ -60,10 +68,13 @@ class OnlineCaMiddleware(object):
     CA_CLASS_FACTORY_OPTNAME = 'ca_class_factory_path'
 
     # Default environ key names
-    DEFAULT_CA_CLASS_FACTORY = 'ca.impl.CertificateAuthority:from_keywords'
+    DEFAULT_CA_CLASS_FACTORY = 'onlineca.server.impl.CertificateAuthorityImpl'
     
-    DEFAULT_ISSUE_CERT_URIPATH = 'certificate/'
-    DEFAULT_TRUSTROOTS_URIPATH = 'trustroots/'
+    ISSUE_CERT_URIPATH_OPTNAME = 'issue_cert_uripath'
+    DEFAULT_ISSUE_CERT_URIPATH = '/certificate/'
+    
+    TRUSTROOTS_URIPATH_OPTNAME = 'trustroots_uripath'
+    DEFAULT_TRUSTROOTS_URIPATH = '/trustroots/'
     
     CERT_REQ_POST_PARAM_KEYNAME = 'certificate_request'
     
@@ -84,7 +95,7 @@ class OnlineCaMiddleware(object):
         @type app: function
         @param app: WSGI callable for next application in stack
         '''
-        self._app = None
+        self._app = app
         self.__ca_class_factory_path = None
         self.__issue_cert_uripath = None
         self.__trustroots_uripath = None
@@ -119,6 +130,14 @@ class OnlineCaMiddleware(object):
 
         self.ca_class_factory_path = app_conf.get(ca_class_factory_path_optname,
                                                   cls.DEFAULT_CA_CLASS_FACTORY)
+
+        issuecert_uripath_optname = prefix + cls.DEFAULT_ISSUE_CERT_URIPATH       
+        self.__issue_cert_uripath = app_conf.get(issuecert_uripath_optname,
+                                                 cls.DEFAULT_ISSUE_CERT_URIPATH)
+        
+        trustroot_uripath_optname = prefix + cls.DEFAULT_TRUSTROOTS_URIPATH
+        self.__trustroots_uripath = app_conf.get(trustroot_uripath_optname,
+                                                 cls.DEFAULT_TRUSTROOTS_URIPATH)
         
         ca_opt_prefix = prefix + ca_prefix
         ca_opt_offset = len(ca_opt_prefix)
@@ -217,11 +236,10 @@ class OnlineCaMiddleware(object):
         '''
         log.debug("OnlineCaMiddleware.__call__ ...")
         request = Request(environ)
-        path_info = environ['PATH_INFO']
-        if path_info == self.__issue_cert_uripath:
+        if request.path_info == self.__issue_cert_uripath:
             response = self._issue_certificate(request)
                    
-        elif path_info == self.__trustroots_uripath:
+        elif request.path_info == self.__trustroots_uripath:
             response = self._get_trustroots()
             
         else:              
@@ -239,7 +257,7 @@ class OnlineCaMiddleware(object):
         if request.method != 'POST':
             response = "HTTP Request method not recognised"
             log.error("HTTP Request method %r not recognised", request.method)
-            raise HTTPMethodNotAllowed(response)
+            raise HTTPMethodNotAllowed(response, headers=[('Allow', 'POST')])
             
         # Extract cert request and convert to standard string - SSL library
         # will not accept unicode
