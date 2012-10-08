@@ -8,7 +8,6 @@
 <path>/online_ca_service</path>
 </pydev_pathproperty>
 <pydev_pathproperty name="org.python.pydev.PROJECT_EXTERNAL_SOURCE_PATH">
-<path>/Users/philipkershaw/Documents/workspace/MyProxyClient</path>
-<path>/Users/philipkershaw/Documents/workspace/ndg_httpsclient</path>
+<path>/Users/philipkershaw/Documents/workspace/CertificateAuthority</path>
 </pydev_pathproperty>
 </pydev_project>

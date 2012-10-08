@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 from os import path
 
 THIS_DIR = path.abspath(path.dirname(__file__))
-INI_FILENAME = 'myproxywsgi.ini'
+INI_FILENAME = 'onlineca-server.ini'
 ini_filepath = path.join(THIS_DIR, INI_FILENAME) 
 
 from paste.script.serve import ServeCommand

@@ -68,6 +68,7 @@ class OnlineCaMiddleware(object):
     CERT_REQ_POST_PARAM_KEYNAME = 'certificate_request'
     
     __slots__ = (
+        '_app',
         '__ca',
         '__ca_class_factory_path',
         '__issue_cert_uripath',

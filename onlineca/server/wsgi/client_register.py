@@ -14,8 +14,8 @@ from datetime import datetime
 from OpenSSL import crypto
 from paste.httpexceptions import HTTPUnauthorized
 
-from myproxy.ws.openssl_utils import X509SubjectName
-from myproxy.ws.server.wsgi.httpbasicauth import HttpBasicAuthMiddleware
+from onlineca.server.openssl_utils import X509SubjectName
+from onlineca.server.wsgi.httpbasicauth import HttpBasicAuthMiddleware
 
 
 class ClientRegisterMiddlewareError(Exception):
