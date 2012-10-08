@@ -46,8 +46,11 @@ class OnlineCaMiddleware(object):
     certificate request posted in logon calls
     @type CERT_REQ_POST_PARAM_KEYNAME: string
     
-    @ivar __ca_class_factory_path: 
-    @type __ca_class_factory_path: string
+    @ivar DEFAULT_ISSUE_CERT_URIPATH: 
+    @type DEFAULT_ISSUE_CERT_URIPATH: string
+    
+    @ivar DEFAULT_TRUSTROOTS_URIPATH: 
+    @type DEFAULT_TRUSTROOTS_URIPATH: string
     
     @cvar PARAM_PREFIX: prefix for ini file option names 
     @type PARAM_PREFIX: string
@@ -57,15 +60,18 @@ class OnlineCaMiddleware(object):
     CA_CLASS_FACTORY_OPTNAME = 'ca_class_factory_path'
 
     # Default environ key names
-    DEFAULT_CA_CLASS_FACTORY = 'ca.impl.CertificateAuthority'
+    DEFAULT_CA_CLASS_FACTORY = 'ca.impl.CertificateAuthority:from_keywords'
+    
+    DEFAULT_ISSUE_CERT_URIPATH = 'certificate/'
+    DEFAULT_TRUSTROOTS_URIPATH = 'trustroots/'
     
     CERT_REQ_POST_PARAM_KEYNAME = 'certificate_request'
     
     __slots__ = (
         '__ca',
         '__ca_class_factory_path',
-        '__issue_cert_path',
-        '__trustroots_path',
+        '__issue_cert_uripath',
+        '__trustroots_uripath',
         '__trustroots_dir'
     )
     PARAM_PREFIX = 'onlineca.server.'
@@ -79,8 +85,8 @@ class OnlineCaMiddleware(object):
         '''
         self._app = None
         self.__ca_class_factory_path = None
-        self.__issue_cert_path = None
-        self.__trustroots_path = None
+        self.__issue_cert_uripath = None
+        self.__trustroots_uripath = None
         self.__ca = None
         
     @classmethod
@@ -106,7 +112,7 @@ class OnlineCaMiddleware(object):
         dictionary
         """
         
-        # Extract additional parameters
+        # Extract parameters
         cls = self.__class__
         ca_class_factory_path_optname = prefix + cls.CA_CLASS_FACTORY_OPTNAME
 
@@ -147,15 +153,15 @@ class OnlineCaMiddleware(object):
         self.__ca_class_factory_path = value
 
     @property
-    def issue_cert_path(self):
+    def issue_cert_uripath(self):
         """Get URI path for get trust roots method
         @rtype: basestring
         @return: path for get trust roots method
         """
-        return self.__issue_cert_path
+        return self.__issue_cert_uripath
 
-    @issue_cert_path.setter
-    def issue_cert_path(self, value):
+    @issue_cert_uripath.setter
+    def issue_cert_uripath(self, value):
         """Set URI path for get trust roots method
         @type value: basestring
         @param value: path for get trust roots method
@@ -164,25 +170,25 @@ class OnlineCaMiddleware(object):
             raise TypeError('Expecting string type for "path"; got %r' % 
                             type(value))
         
-        self.__issue_cert_path = value
+        self.__issue_cert_uripath = value
 
     @property
-    def trustroots_path(self):
+    def trustroots_uripath(self):
         """Get URI path for get trust roots method
         @rtype: basestring
         @return: path for get trust roots method
         """
-        return self.__trustroots_path
+        return self.__trustroots_uripath
 
-    @trustroots_path.setter
-    def trustroots_path(self, value):
+    @trustroots_uripath.setter
+    def trustroots_uripath(self, value):
         """trust roots path
         """
         if not isinstance(value, basestring):
             raise TypeError('Expecting string type for "path"; got %r' % 
                             type(value))
         
-        self.__trustroots_path = value 
+        self.__trustroots_uripath = value 
 
     @property
     def trustroots_dir(self):
@@ -211,10 +217,10 @@ class OnlineCaMiddleware(object):
         log.debug("OnlineCaMiddleware.__call__ ...")
         request = Request(environ)
         path_info = environ['PATH_INFO']
-        if path_info == self.__issue_cert_path:
+        if path_info == self.__issue_cert_uripath:
             response = self._issue_certificate(request)
                    
-        elif path_info == self.__trustroots_path:
+        elif path_info == self.__trustroots_uripath:
             response = self._get_trustroots()
             
         else:              
