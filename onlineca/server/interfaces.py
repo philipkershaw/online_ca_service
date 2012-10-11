@@ -10,18 +10,17 @@ class OnlineCaInterface(object):
     __metaclass__ = ABCMeta
     
     @abstractmethod
-    def issue_cert(self, csr, environ):
+    def issue_certificate(self, csr, subject_name, environ):
         '''Issue a certificate from Certificate Signing Request passed
         
         @param csr: Certificate Signing Request
         @type csr: OpenSSL.crypto.X509Req
+        @param subject_name: set alternate subject name to one specified in the
+        certificate request.  If None, use the subject name in the certificate
+        request.
+        @type subject_name: OpenSSL.crypto.X509Name or None
         @param environ: WSGI environ dictionary
         @type environ: dict-like object
         @return: signed certificate
         @rtype: OpenSSL.crypto.X509
         '''
-        
-    @abstractmethod
-    def get_trustroots(self, environ):
-        '''Return CA trust roots (i.e. CA certificates and any signing policy
-        files) need to trust this online CA'''

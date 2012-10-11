@@ -14,9 +14,11 @@ log = logging.getLogger(__name__)
 
 import os
 import base64
+import string
 
 from webob import Request
-from paste.httpexceptions import HTTPMethodNotAllowed, HTTPBadRequest
+from paste.httpexceptions import (HTTPException, HTTPMethodNotAllowed, 
+                                  HTTPBadRequest)
 from OpenSSL import crypto
 
 from onlineca.server.interfaces import OnlineCaInterface
@@ -24,7 +26,12 @@ from onlineca.server.factory import call_module_object
 
 
 class OnlineCaMiddlewareError(Exception):
-    """Errors related to the MyProxy Web Service middleware"""
+    """Errors related to the Online CA Service middleware"""
+
+
+class OnlineCaMiddlewareConfigError(Exception):
+    """Errors related to the configuration for the Online CA Service middleware
+    """
 
 
 class OnlineCaMiddleware(object):
@@ -73,8 +80,13 @@ class OnlineCaMiddleware(object):
     ISSUE_CERT_URIPATH_OPTNAME = 'issue_cert_uripath'
     DEFAULT_ISSUE_CERT_URIPATH = '/certificate/'
     
+    CERT_SUBJECT_NAME_TEMPLATE_OPTNAME = 'cert_subject_name_template'
+    
     TRUSTROOTS_URIPATH_OPTNAME = 'trustroots_uripath'
     DEFAULT_TRUSTROOTS_URIPATH = '/trustroots/'
+    
+    TRUSTROOTS_DIR_OPTNAME = 'trustroots_dir'
+    DEFAULT_TRUSTROOTS_DIR = None
     
     CERT_REQ_POST_PARAM_KEYNAME = 'certificate_request'
     
@@ -83,6 +95,7 @@ class OnlineCaMiddleware(object):
         '__ca',
         '__ca_class_factory_path',
         '__issue_cert_uripath',
+        '__cert_subject_name_template',
         '__trustroots_uripath',
         '__trustroots_dir'
     )
@@ -98,7 +111,9 @@ class OnlineCaMiddleware(object):
         self._app = app
         self.__ca_class_factory_path = None
         self.__issue_cert_uripath = None
+        self.__cert_subject_name_template = None
         self.__trustroots_uripath = None
+        self.__trustroots_dir = None
         self.__ca = None
         
     @classmethod
@@ -135,9 +150,20 @@ class OnlineCaMiddleware(object):
         self.__issue_cert_uripath = app_conf.get(issuecert_uripath_optname,
                                                  cls.DEFAULT_ISSUE_CERT_URIPATH)
         
-        trustroot_uripath_optname = prefix + cls.DEFAULT_TRUSTROOTS_URIPATH
+        cert_subj_name_optname = prefix + cls.CERT_SUBJECT_NAME_TEMPLATE_OPTNAME
+        self.__cert_subject_name_template = app_conf.get(cert_subj_name_optname)
+        if self.__cert_subject_name_template is None:
+            raise OnlineCaMiddlewareConfigError('Error no certificate subject '
+                                                'name set (config option %r)' %
+                                                cert_subj_name_optname)
+        
+        trustroot_uripath_optname = prefix + cls.TRUSTROOTS_URIPATH_OPTNAME
         self.__trustroots_uripath = app_conf.get(trustroot_uripath_optname,
                                                  cls.DEFAULT_TRUSTROOTS_URIPATH)
+        
+        trustroot_dir_optname = prefix + cls.TRUSTROOTS_DIR_OPTNAME
+        self.__trustroots_dir = app_conf.get(trustroot_dir_optname,
+                                             cls.DEFAULT_TRUSTROOTS_DIR)
         
         ca_opt_prefix = prefix + ca_prefix
         ca_opt_offset = len(ca_opt_prefix)
@@ -187,11 +213,25 @@ class OnlineCaMiddleware(object):
         @param value: path for get trust roots method
         """
         if not isinstance(value, basestring):
-            raise TypeError('Expecting string type for "path"; got %r' % 
+            raise TypeError('Expecting string type for '
+                            '"issue_cert_uripath"; got %r' % 
                             type(value))
         
         self.__issue_cert_uripath = value
 
+    @property
+    def cert_subject_name_template(self):
+        return self.__cert_subject_name_template
+
+    @cert_subject_name_template.setter
+    def cert_subject_name_template(self, value):
+        if not isinstance(value, basestring):
+            raise TypeError('Expecting string type for '
+                            '"cert_subject_name_template"; got %r' % 
+                            type(value))
+        
+        self.__cert_subject_name_template = value
+        
     @property
     def trustroots_uripath(self):
         """Get URI path for get trust roots method
@@ -236,20 +276,31 @@ class OnlineCaMiddleware(object):
         '''
         log.debug("OnlineCaMiddleware.__call__ ...")
         request = Request(environ)
+        try:
+            response = self._match_request(request)
+            
+        except HTTPException, e:
+            return e(environ, start_response)
+        
+        if response is None:
+            self._app(environ, start_response)
+        else:
+            start_response('200 OK',
+                           [('Content-length', str(len(response))),
+                            ('Content-type', 'text/plain')])
+            return [response]
+       
+    def _match_request(self, request):
         if request.path_info == self.__issue_cert_uripath:
             response = self._issue_certificate(request)
                    
         elif request.path_info == self.__trustroots_uripath:
-            response = self._get_trustroots()
-            
+            response = self._get_trustroots(request)
         else:              
-            return self._app(environ, start_response)
+            response = None
             
-        start_response('200 OK',
-                       [('Content-length', str(len(response))),
-                        ('Content-type', 'text/plain')])
-        return [response]
-            
+        return response
+             
     def _issue_certificate(self, request):
         '''Issue a new certificate from the Certificate Signing Request passed
         in the POST'd request'''
@@ -279,8 +330,17 @@ class OnlineCaMiddleware(object):
             log.error("Error loading input certificate request: %r", 
                       pem_cert_req)
             raise HTTPBadRequest("Error loading input certificate request")
-            
-        cert = self.__ca.issue_certificate(cert_req)
+        
+        subject_name_tmpl = string.Template(self.cert_subject_name_template)
+        subject_name_str = subject_name_tmpl.substitute(
+                                                REMOTE_USER=request.remote_user)
+
+        from onlineca.server.openssl_utils import X509SubjectName
+        subject_name = X509SubjectName.from_string(subject_name_str)
+        subject_name_ = subject_name.as_openssl_x509_subject_name()
+        
+        cert = self.__ca.issue_certificate(cert_req, subject_name_, 
+                                           request.environ)
         return cert
 
     def _get_trustroots(self, request):
@@ -290,15 +350,46 @@ class OnlineCaMiddleware(object):
         @rtype: basestring
         @return: trust roots base64 encoded and concatenated together
         """
-        if request.method != 'POST':
+        if request.method != 'GET':
             response = "HTTP Request method not recognised"
             log.error("HTTP Request method %r not recognised", request.method)
-            raise HTTPMethodNotAllowed(response)
+            raise HTTPMethodNotAllowed(response, headers=[('Allow', 'GET')])
             
         trust_roots = ''
         for filename in os.listdir(self.trustroots_dir):
-            file_content = open(filename).read()            
+            filepath = os.path.join(self.trustroots_dir, filename)
+            if os.path.isdir(filepath):
+                continue
+            
+            file_content = open(filepath).read()
             trust_roots += "%s=%s\n" % (filename, 
                                         base64.b64encode(file_content))
         
         return trust_roots
+
+
+from paste.httpexceptions import HTTPUnauthorized
+
+
+class AuthenticationFuncMiddleware(object):
+    AUTH_FUNC_ENVIRON_KEYNAME_OPTNAME = 'auth_func_environ_keyname'
+    def __init__(self, app):
+        self._app = app
+        
+    @classmethod
+    def filter_app_factory(cls, app, global_conf, prefix='', **app_conf):
+        obj = cls(app)
+        obj.auth_func_environ_keyname = app_conf[prefix + \
+                                        cls.AUTH_FUNC_ENVIRON_KEYNAME_OPTNAME]
+        
+        return obj
+    
+    def __call__(self, environ, start_response):
+        def auth_func(environ, start_response, username, password):
+            if username == 'testuser' and password == 'changeme':
+                environ['REMOTE_USER'] = username
+            else:
+                raise HTTPUnauthorized()
+            
+        environ[self.auth_func_environ_keyname] = auth_func
+        return self._app(environ, start_response)
