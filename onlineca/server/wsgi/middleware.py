@@ -100,7 +100,7 @@ class OnlineCaMiddleware(object):
         '__trustroots_dir'
     )
     PARAM_PREFIX = 'onlineca.server.'
-    CA_PARAM_PREFIX = CA_CLASS_FACTORY_OPTNAME + '.'
+    CA_PARAM_PREFIX = 'ca_class.'
     
     def __init__(self, app):
         '''Create attributes
@@ -131,8 +131,8 @@ class OnlineCaMiddleware(object):
         
         @type prefix: basestring
         @param prefix: prefix for configuration items
-        @type myProxyClientPrefix: basestring
-        @param myProxyClientPrefix: explicit prefix for MyProxyClient class 
+        @type ca_prefix: basestring
+        @param ca_prefix: explicit prefix for CA class 
         specific configuration items - ignored in this derived method
         @type app_conf: dict        
         @param app_conf: PasteDeploy application specific configuration 
@@ -303,7 +303,13 @@ class OnlineCaMiddleware(object):
              
     def _issue_certificate(self, request):
         '''Issue a new certificate from the Certificate Signing Request passed
-        in the POST'd request'''
+        in the POST'd request
+        
+        @param request: HTTP request
+        @type request: webob.Request
+        @return: new certificate
+        @rtype: string
+        '''
         
         if request.method != 'POST':
             response = "HTTP Request method not recognised"
@@ -332,8 +338,7 @@ class OnlineCaMiddleware(object):
             raise HTTPBadRequest("Error loading input certificate request")
         
         subject_name_tmpl = string.Template(self.cert_subject_name_template)
-        subject_name_str = subject_name_tmpl.substitute(
-                                                REMOTE_USER=request.remote_user)
+        subject_name_str = subject_name_tmpl.substitute(**request.environ)
 
         from onlineca.server.openssl_utils import X509SubjectName
         subject_name = X509SubjectName.from_string(subject_name_str)
@@ -341,7 +346,9 @@ class OnlineCaMiddleware(object):
         
         cert = self.__ca.issue_certificate(cert_req, subject_name_, 
                                            request.environ)
-        return cert
+        
+        cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+        return cert_pem
 
     def _get_trustroots(self, request):
         """Call getTrustRoots method on MyProxyClient instance retrieved from
@@ -366,30 +373,3 @@ class OnlineCaMiddleware(object):
                                         base64.b64encode(file_content))
         
         return trust_roots
-
-
-from paste.httpexceptions import HTTPUnauthorized
-
-
-class AuthenticationFuncMiddleware(object):
-    AUTH_FUNC_ENVIRON_KEYNAME_OPTNAME = 'auth_func_environ_keyname'
-    def __init__(self, app):
-        self._app = app
-        
-    @classmethod
-    def filter_app_factory(cls, app, global_conf, prefix='', **app_conf):
-        obj = cls(app)
-        obj.auth_func_environ_keyname = app_conf[prefix + \
-                                        cls.AUTH_FUNC_ENVIRON_KEYNAME_OPTNAME]
-        
-        return obj
-    
-    def __call__(self, environ, start_response):
-        def auth_func(environ, start_response, username, password):
-            if username == 'testuser' and password == 'changeme':
-                environ['REMOTE_USER'] = username
-            else:
-                raise HTTPUnauthorized()
-            
-        environ[self.auth_func_environ_keyname] = auth_func
-        return self._app(environ, start_response)
