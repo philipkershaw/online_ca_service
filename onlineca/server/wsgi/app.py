@@ -1,10 +1,10 @@
-"""HTTPS proxy to MyProxy server WSGI Application
+"""Online Certificate Authority WSGI Application
  
-NERC DataGrid Project
+Contrail Project
 """
 __author__ = "P J Kershaw"
 __date__ = "21/05/10"
-__copyright__ = "(C) 2010 Science and Technology Facilities Council"
+__copyright__ = "(C) 2012 Science and Technology Facilities Council"
 __license__ = "BSD - see LICENSE file in top-level directory"
 __contact__ = "Philip.Kershaw@stfc.ac.uk"
 __revision__ = "$Id: $"
@@ -24,10 +24,10 @@ class OnlineCaApp(object):
     should be done out of band of this app e.g. in other filter middleware or
     Apache SSL configuration.
     """
-    PARAM_PREFIX = OnlineCaMiddleware.PARAM_PREFIX
+    DEFAULT_PARAM_PREFIX = OnlineCaMiddleware.DEFAULT_PARAM_PREFIX
     
     @classmethod
-    def app_factory(cls, global_conf, prefix=PARAM_PREFIX, **app_conf): 
+    def app_factory(cls, global_conf, prefix=DEFAULT_PARAM_PREFIX, **app_conf): 
         """Function following Paste app factory signature
         
         @type global_conf: dict        
@@ -67,7 +67,7 @@ class OnlineCaWithClientRegisterApp(OnlineCaApp):
         ClientRegisterMiddleware.CLIENT_REGISTER_OPT_PREFIX
     
     @classmethod
-    def app_factory(cls, global_conf, prefix=OnlineCaApp.PARAM_PREFIX, 
+    def app_factory(cls, global_conf, prefix=OnlineCaApp.DEFAULT_PARAM_PREFIX, 
                     client_register_mware_prefix=CLIENT_REGISTER_OPT_PREFIX, 
                     **app_conf): 
         """Function following Paste app factory signature

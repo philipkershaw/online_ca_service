@@ -1,5 +1,7 @@
-"""MyProxy Web Service client register module - provides simple client 
+"""Online CA Service client register module - provides simple client 
 delegation mechanism
+
+Contrail Project
 """
 __author__ = "P J Kershaw"
 __date__ = "22/09/12"

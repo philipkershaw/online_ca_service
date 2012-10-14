@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Distribution Utilities setup program for MyProxy Server Utilities Package
 
-NERC DataGrid Project
+Contrail Project
 """
 __author__ = "P J Kershaw"
 __date__ = "21/05/10"

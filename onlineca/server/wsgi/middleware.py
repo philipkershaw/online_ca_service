@@ -1,7 +1,7 @@
-"""MyProxy Web Service WSGI middleware - exposes MyProxy logon and get trust
+"""Online CA Service WSGI middleware - exposes issue certificate and get trust
 roots as web service methods
  
-NERC MashMyData Project
+Contrail Project
 """
 __author__ = "P J Kershaw"
 __date__ = "24/05/10"
@@ -67,8 +67,8 @@ class OnlineCaMiddleware(object):
     @ivar DEFAULT_TRUSTROOTS_URIPATH: URI sub-path for get trustroots call
     @type DEFAULT_TRUSTROOTS_URIPATH: string
     
-    @cvar PARAM_PREFIX: prefix for ini file option names 
-    @type PARAM_PREFIX: string
+    @cvar DEFAULT_PARAM_PREFIX: prefix for ini file option names 
+    @type DEFAULT_PARAM_PREFIX: string
     """
     
     # Options for ini file
@@ -99,8 +99,8 @@ class OnlineCaMiddleware(object):
         '__trustroots_uripath',
         '__trustroots_dir'
     )
-    PARAM_PREFIX = 'onlineca.server.'
-    CA_PARAM_PREFIX = 'ca_class.'
+    DEFAULT_PARAM_PREFIX = 'onlineca.server.'
+    CA_DEFAULT_PARAM_PREFIX = 'ca_class.'
     
     def __init__(self, app):
         '''Create attributes
@@ -117,14 +117,16 @@ class OnlineCaMiddleware(object):
         self.__ca = None
         
     @classmethod
-    def filter_app_factory(cls, app, global_conf, prefix=PARAM_PREFIX, 
+    def filter_app_factory(cls, app, global_conf, prefix=DEFAULT_PARAM_PREFIX, 
                            **app_conf):
         obj = cls(app)
         obj.parse_config(prefix=prefix, **app_conf)
         
         return obj
      
-    def parse_config(self, prefix=PARAM_PREFIX, ca_prefix=CA_PARAM_PREFIX,
+    def parse_config(self, 
+                     prefix=DEFAULT_PARAM_PREFIX, 
+                     ca_prefix=CA_DEFAULT_PARAM_PREFIX,
                      **app_conf):
         """Parse dictionary of configuration items updating the relevant 
         attributes of this instance
@@ -267,7 +269,7 @@ class OnlineCaMiddleware(object):
         self.__trustroots_dir = value 
                    
     def __call__(self, environ, start_response):
-        '''Set MyProxy logon method in environ
+        '''Match request and call appropriate callback method
         
         @type environ: dict
         @param environ: WSGI environment variables dictionary
@@ -276,6 +278,7 @@ class OnlineCaMiddleware(object):
         '''
         log.debug("OnlineCaMiddleware.__call__ ...")
         request = Request(environ)
+        
         try:
             response = self._match_request(request)
             

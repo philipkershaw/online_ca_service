@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test script to run MyProxy web service interface in the Paster web 
+"""Test script to run Online CA service with HTTP Basic Auth in the Paster web 
 application server.
 """
 __author__ = "P J Kershaw"

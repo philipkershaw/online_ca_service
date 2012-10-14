@@ -1,15 +1,15 @@
-"""WSGI middleware implementing HTTP Basic Auth to support HTTPS proxy app to 
-MyProxy server.
+"""WSGI middleware implementing HTTP Basic Auth to support Online CA service
+
+Contrail Project
 """
 __author__ = "P J Kershaw"
-__date__ = "21/05/10"
-__copyright__ = "(C) 2010 Science and Technology Facilities Council"
+__date__ = "21/05/12"
+__copyright__ = "(C) 2012 Science and Technology Facilities Council"
 __license__ = "BSD - see LICENSE file in top-level directory"
 __contact__ = "Philip.Kershaw@stfc.ac.uk"
 __revision__ = "$Id$"
 import logging
 log = logging.getLogger(__name__)
-import traceback
 import re
 import httplib
 import base64

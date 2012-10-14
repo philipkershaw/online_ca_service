@@ -1,8 +1,13 @@
-'''
-Created on Oct 12, 2012
-
-@author: philipkershaw
-'''
+"""Online CA Service - Authentication plugin for HTTP Basic Auth middleware
+ 
+Contrail Project
+"""
+__author__ = "P J Kershaw"
+__date__ = "23/03/11"
+__copyright__ = "(C) 2012 Science and Technology Facilities Council"
+__license__ = "BSD - see LICENSE file in top-level directory"
+__contact__ = "Philip.Kershaw@stfc.ac.uk"
+__revision__ = "$Id$"
 from paste.httpexceptions import HTTPUnauthorized
 
 

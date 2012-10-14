@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-"""Test script to run MyProxy web service interface in the Paster web 
+"""Test script to run Online CA service interface in the Paster web 
 application server.
+
+Contrail Project
 """
 __author__ = "P J Kershaw"
 __date__ = "03/08/12"
