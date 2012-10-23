@@ -31,13 +31,13 @@ class X509SubjectName(object):
         'commonName':               'CN',
         'organisationalUnitName':   'OU',
         'organisation':             'O',
-        'countryName':                'C',
+        'countryName':              'C',
         'emailAddress':             'EMAILADDRESS',
-        'localityName':                'L',
-        'stateOrProvinceName':        'ST',
+        'localityName':             'L',
+        'stateOrProvinceName':      'ST',
         'streetAddress':            'STREET',
-        'domainComponent':            'DC',
-        'userid':                    'UID'
+        'domainComponent':          'DC',
+        'userid':                   'UID'
     }
     SLASH_PARSER_RE_STR = '/(%s)=' % '|'.join(SHORT_NAME_LOOKUP.keys() + 
                                               SHORT_NAME_LOOKUP.values())    
