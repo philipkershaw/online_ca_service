@@ -20,7 +20,8 @@ import paste.fixture
 from paste.deploy import loadapp
 from paste.httpexceptions import HTTPUnauthorized
 
-from myproxy.ws.server.wsgi.client_register import ClientRegisterMiddleware
+from contrail.security.onlineca.server.wsgi.client_register import \
+                                                        ClientRegisterMiddleware
 from myproxy.ws.test import test_dir, test_ca_dir
 
 

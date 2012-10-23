@@ -1,7 +1,7 @@
 """
-Class Factory
+Class Factory and module import utility
 
-NERC DataGrid project
+Contrail project
 """
 __author__ = "Philip Kershaw"
 __date__ = "15/02/10"

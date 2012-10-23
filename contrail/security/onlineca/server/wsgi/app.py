@@ -11,7 +11,8 @@ __revision__ = "$Id: $"
 from paste.httpexceptions import HTTPNotFound
 
 from contrail.security.onlineca.server.wsgi.middleware import OnlineCaMiddleware
-from contrail.security.onlineca.server.wsgi.client_register import ClientRegisterMiddleware
+from contrail.security.onlineca.server.wsgi.client_register import \
+                                                    ClientRegisterMiddleware
 
         
 class OnlineCaApp(object):

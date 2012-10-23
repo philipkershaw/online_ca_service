@@ -14,8 +14,9 @@ import base64
 import paste.fixture
 from paste.deploy import loadapp
 
-from myproxy.ws.server.wsgi.httpbasicauth import (HttpBasicAuthMiddleware,
-                                               HttpBasicAuthResponseException)
+from contrail.security.onlineca.server.wsgi.httpbasicauth import (
+                                                HttpBasicAuthMiddleware,
+                                                HttpBasicAuthResponseException)
 
 
 class TestApp(object):

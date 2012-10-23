@@ -1,8 +1,14 @@
-'''
-Created on Oct 2, 2012
+"""
+Class Factory and module import utility
 
-@author: philipkershaw
-'''
+Contrail project
+"""
+__author__ = "Philip Kershaw"
+__date__ = "02/10/12"
+__copyright__ = "(C) 2012 Science and Technology Facilities Council"
+__license__ = "BSD - see LICENSE file in top-level directory"
+__contact__ = "Philip.Kershaw@stfc.ac.uk"
+__revision__ = '$Id$'
 from abc import ABCMeta, abstractmethod
 
 
