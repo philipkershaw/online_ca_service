@@ -10,8 +10,8 @@ __contact__ = "Philip.Kershaw@stfc.ac.uk"
 __revision__ = "$Id: $"
 from paste.httpexceptions import HTTPNotFound
 
-from onlineca.server.wsgi.middleware import OnlineCaMiddleware
-from onlineca.server.wsgi.client_register import ClientRegisterMiddleware
+from contrail.security.onlineca.server.wsgi.middleware import OnlineCaMiddleware
+from contrail.security.onlineca.server.wsgi.client_register import ClientRegisterMiddleware
 
         
 class OnlineCaApp(object):

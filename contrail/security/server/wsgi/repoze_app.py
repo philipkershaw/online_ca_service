@@ -9,8 +9,8 @@ __copyright__ = "(C) 2012 Science and Technology Facilities Council"
 __license__ = "BSD - see LICENSE file in top-level directory"
 __contact__ = "Philip.Kershaw@stfc.ac.uk"
 __revision__ = "$Id$"
-from onlineca.server.wsgi.app import OnlineCaApp
-from onlineca.server.wsgi.repoze_middleware import RepozeWhoUrlMatchFilter
+from contrail.security.onlineca.server.wsgi.app import OnlineCaApp
+from contrail.security.onlineca.server.wsgi.repoze_middleware import RepozeWhoUrlMatchFilter
 
 
 class RepozeSecuredOnlineCaApp(object):

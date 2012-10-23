@@ -16,8 +16,9 @@ from datetime import datetime
 from OpenSSL import crypto
 from paste.httpexceptions import HTTPUnauthorized
 
-from onlineca.server.openssl_utils import X509SubjectName
-from onlineca.server.wsgi.httpbasicauth import HttpBasicAuthMiddleware
+from contrail.security.onlineca.server.openssl_utils import X509SubjectName
+from contrail.security.onlineca.server.wsgi.httpbasicauth import \
+                                                    HttpBasicAuthMiddleware
 
 
 class ClientRegisterMiddlewareError(Exception):

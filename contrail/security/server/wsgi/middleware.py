@@ -21,8 +21,8 @@ from paste.httpexceptions import (HTTPException, HTTPMethodNotAllowed,
                                   HTTPBadRequest)
 from OpenSSL import crypto
 
-from onlineca.server.interfaces import OnlineCaInterface
-from onlineca.server.factory import call_module_object
+from contrail.security.onlineca.server.interfaces import OnlineCaInterface
+from contrail.security.onlineca.server.factory import call_module_object
 
 
 class OnlineCaMiddlewareError(Exception):
@@ -343,7 +343,7 @@ class OnlineCaMiddleware(object):
         subject_name_tmpl = string.Template(self.cert_subject_name_template)
         subject_name_str = subject_name_tmpl.substitute(**request.environ)
 
-        from onlineca.server.openssl_utils import X509SubjectName
+        from contrail.security.onlineca.server.openssl_utils import X509SubjectName
         subject_name = X509SubjectName.from_string(subject_name_str)
         subject_name_ = subject_name.as_openssl_x509_subject_name()
         

@@ -3,7 +3,7 @@ Created on Oct 2, 2012
 
 @author: philipkershaw
 '''
-from onlineca.server.interfaces import OnlineCaInterface
+from contrail.security.onlineca.server.interfaces import OnlineCaInterface
 from ca.callout_impl import CertificateAuthorityWithCallout
 from ca.impl import CertificateAuthority
 
