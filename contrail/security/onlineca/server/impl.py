@@ -4,8 +4,8 @@ Created on Oct 2, 2012
 @author: philipkershaw
 '''
 from contrail.security.onlineca.server.interfaces import OnlineCaInterface
-from ca.callout_impl import CertificateAuthorityWithCallout
-from ca.impl import CertificateAuthority
+from contrail.security.ca.callout_impl import CertificateAuthorityWithCallout
+from contrail.security.ca.impl import CertificateAuthority
 
 
 class CertificateAuthorityWithCalloutImpl(OnlineCaInterface):
