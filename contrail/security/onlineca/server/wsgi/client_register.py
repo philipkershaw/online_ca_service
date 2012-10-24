@@ -161,7 +161,7 @@ class ClientRegisterMiddleware(object):
         
         if username not in self.client_register[dn]:
             log.info('No match for user %r and client certificate DN %r '
-                     ' in client register', username, dn)            
+                     'in client register', username, dn)            
             raise HTTPUnauthorized()
         
         return True

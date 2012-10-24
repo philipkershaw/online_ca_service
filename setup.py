@@ -42,7 +42,7 @@ systems.
 
 Configuration
 =============
-Examples are contained in ``onlineca.server.test``.
+Examples are contained in ``contrail.security.onlineca.server.test``.
 ''',
     author =          	'Philip Kershaw',
     author_email =    	'Philip.Kershaw@stfc.ac.uk',
@@ -55,7 +55,7 @@ Examples are contained in ``onlineca.server.test``.
                          'PyOpenSSL'],
     extras_require =    {'repoze.who': 'repoze.who'},
     license =           __license__,
-    test_suite =        'onlineca.server.test',
+    test_suite =        'contrail.securuity.onlineca.server.test',
     packages =          find_packages(),
     package_data =      {
         'onlineca.server.test': [

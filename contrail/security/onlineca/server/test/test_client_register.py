@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Unit tests for MyProxy WSGI Middleware classes and Application.  These are
+"""Unit tests for Online CA WSGI Middleware classes and Application.  These are
 run using paste.fixture i.e. tests stubs to a web application server
 """
 __author__ = "P J Kershaw"
@@ -22,12 +22,13 @@ from paste.httpexceptions import HTTPUnauthorized
 
 from contrail.security.onlineca.server.wsgi.client_register import \
                                                         ClientRegisterMiddleware
-from myproxy.ws.test import test_dir, test_ca_dir
+from contrail.security.onlineca.server.test import TEST_DIR, TEST_CA_DIR
 
 
 class TestApp(object):
     """Test WSGI Application for use with the unit tests for the Client Register
-    middleware developed for the myproxy.ws.server.app.MyProxyApp application
+    middleware developed for the 
+    contrail.security.onlineca.server.app.OnlineCaApp application
     """
     def __init__(self, global_conf, **app_conf):
         """Follow standard Paste Deploy app factory function signature"""
@@ -48,14 +49,14 @@ class TestApp(object):
     
 class TestClientRegisterMiddleware(unittest.TestCase):
     CONFIG_FILE = 'client_register.ini'
-    CLIENT_CERT = open(os.path.join(test_dir, 'localhost.crt')).read()
-    INVALID_CLIENT_CERT = open(os.path.join(test_ca_dir, 'd573507a.0')).read()
+    CLIENT_CERT = open(os.path.join(TEST_DIR, 'localhost.crt')).read()
+    INVALID_CLIENT_CERT = open(os.path.join(TEST_CA_DIR, 'd573507a.0')).read()
     
     def setUp(self):
         """Set-up Paste fixture from ini file settings"""
         
         config_filepath = ('config:%s' % self.__class__.CONFIG_FILE)
-        wsgiapp = loadapp(config_filepath, relative_to=test_dir)
+        wsgiapp = loadapp(config_filepath, relative_to=TEST_DIR)
         self.app = paste.fixture.TestApp(wsgiapp)
             
     def test01_valid_client(self):

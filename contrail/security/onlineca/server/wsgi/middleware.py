@@ -23,6 +23,7 @@ from OpenSSL import crypto
 
 from contrail.security.onlineca.server.interfaces import OnlineCaInterface
 from contrail.security.onlineca.server.factory import call_module_object
+from contrail.security.onlineca.server.openssl_utils import X509SubjectName
 
 
 class OnlineCaMiddlewareError(Exception):
@@ -38,9 +39,9 @@ class OnlineCaMiddleware(object):
     """Web service interface for issuing certificates and providing CA trust 
     roots
     
-    @cvar CA_CLASS_FACTORY_OPTNAME: config file option name for Python path to function 
-    or class constructor to make a CA instance.  CA instance must implement CA 
-    interface class as defined in the interfaces module - 
+    @cvar CA_CLASS_FACTORY_OPTNAME: config file option name for Python path to 
+    function or class constructor to make a CA instance.  CA instance must 
+    implement CA interface class as defined in the interfaces module - 
     onlineca.server.interfaces import OnlineCaInterface
     @type CA_CLASS_FACTORY_OPTNAME: string
     
@@ -343,7 +344,6 @@ class OnlineCaMiddleware(object):
         subject_name_tmpl = string.Template(self.cert_subject_name_template)
         subject_name_str = subject_name_tmpl.substitute(**request.environ)
 
-        from contrail.security.onlineca.server.openssl_utils import X509SubjectName
         subject_name = X509SubjectName.from_string(subject_name_str)
         subject_name_ = subject_name.as_openssl_x509_subject_name()
         
