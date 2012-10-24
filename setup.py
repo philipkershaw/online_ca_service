@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Distribution Utilities setup program for MyProxy Server Utilities Package
+"""Distribution Utilities setup program for Contrail CA Server Package
 
 Contrail Project
 """
@@ -50,9 +50,9 @@ Examples are contained in ``contrail.security.onlineca.server.test``.
     maintainer_email =  'Philip.Kershaw@stfc.ac.uk',
 #    url =             	'http://proj.badc.rl.ac.uk/ndg/wiki/Security/MyProxyWebService',
     platforms =         ['POSIX', 'Linux', 'Windows'],
-    install_requires =  ['PasteScript',
-                         'WebOb',
-                         'PyOpenSSL'],
+    install_requires =  ['ContrailCA',
+                         'PasteScript',
+                         'WebOb'],
     extras_require =    {'repoze.who': 'repoze.who'},
     license =           __license__,
     test_suite =        'contrail.securuity.onlineca.server.test',
