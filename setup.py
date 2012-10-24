@@ -48,7 +48,7 @@ Examples are contained in ``contrail.security.onlineca.server.test``.
     author_email =    	'Philip.Kershaw@stfc.ac.uk',
     maintainer =        'Philip Kershaw',
     maintainer_email =  'Philip.Kershaw@stfc.ac.uk',
-    url =             	'http://proj.badc.rl.ac.uk/ndg/wiki/Security/MyProxyWebService',
+#    url =             	'http://proj.badc.rl.ac.uk/ndg/wiki/Security/MyProxyWebService',
     platforms =         ['POSIX', 'Linux', 'Windows'],
     install_requires =  ['PasteScript',
                          'WebOb',
