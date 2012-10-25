@@ -58,8 +58,11 @@ Examples are contained in ``contrail.security.onlineca.server.test``.
     test_suite =        'contrail.securuity.onlineca.server.test',
     packages =          find_packages(),
     package_data =      {
-        'onlineca.server.test': [
+        'contrail.security.onlineca.server.test': [
             'README', '*.cfg', '*.ini', '*.crt', '*.key', '*.pem', 'ca/*.0'
+        ],
+        'contrail.security.onlineca.server.test.repoze_eg': [
+            'passwd', '*.ini',
         ],
     },
     classifiers = [
