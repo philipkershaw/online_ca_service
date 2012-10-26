@@ -59,7 +59,8 @@ Examples are contained in ``contrail.security.onlineca.server.test``.
     packages =          find_packages(),
     package_data =      {
         'contrail.security.onlineca.server.test': [
-            'README', '*.cfg', '*.ini', '*.crt', '*.key', '*.pem', 'ca/*.0'
+            'README', '*.cfg', '*.ini', '*.crt', '*.key', '*.pem', 'ca/*.0',
+            'ca/*.crt', 'ca/*.key'
         ],
         'contrail.security.onlineca.server.test.repoze_eg': [
             'passwd', '*.ini',
