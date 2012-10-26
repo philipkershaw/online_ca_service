@@ -149,7 +149,7 @@ class OnlineCaMiddleware(object):
         self.ca_class_factory_path = app_conf.get(ca_class_factory_path_optname,
                                                   cls.DEFAULT_CA_CLASS_FACTORY)
 
-        issuecert_uripath_optname = prefix + cls.DEFAULT_ISSUE_CERT_URIPATH       
+        issuecert_uripath_optname = prefix + cls.ISSUE_CERT_URIPATH_OPTNAME   
         self.__issue_cert_uripath = app_conf.get(issuecert_uripath_optname,
                                                  cls.DEFAULT_ISSUE_CERT_URIPATH)
         
@@ -157,7 +157,8 @@ class OnlineCaMiddleware(object):
         self.__cert_subject_name_template = app_conf.get(cert_subj_name_optname)
         if self.__cert_subject_name_template is None:
             raise OnlineCaMiddlewareConfigError('Error no certificate subject '
-                                                'name set (config option %r)' %
+                                                'name template set (config '
+                                                'option %r)' %
                                                 cert_subj_name_optname)
         
         trustroot_uripath_optname = prefix + cls.TRUSTROOTS_URIPATH_OPTNAME
@@ -281,7 +282,7 @@ class OnlineCaMiddleware(object):
         request = Request(environ)
         
         try:
-            response = self._match_request(request)
+            response = self._process_request(request)
             
         except HTTPException, e:
             return e(environ, start_response)
@@ -294,7 +295,7 @@ class OnlineCaMiddleware(object):
                             ('Content-type', 'text/plain')])
             return [response]
        
-    def _match_request(self, request):
+    def _process_request(self, request):
         if request.path_info == self.__issue_cert_uripath:
             response = self._issue_certificate(request)
                    
@@ -323,23 +324,32 @@ class OnlineCaMiddleware(object):
         # Extract cert request and convert to standard string - SSL library
         # will not accept unicode
         cert_req_key = self.__class__.CERT_REQ_POST_PARAM_KEYNAME
-        pem_cert_req = str(request.POST.get(cert_req_key))
-        if pem_cert_req is None:
+        str_cert_req = str(request.POST.get(cert_req_key))
+        if str_cert_req is None:
             response = ("No %r form variable set in POST message" % 
                         cert_req_key)
             log.error(response)
             raise HTTPBadRequest(response)
     
-        log.debug("certificate request = %r", pem_cert_req)
+        log.debug("certificate request = %r", str_cert_req)
         
-        # Expecting PEM encoded request
+        # TODO: Deprecate PEM cert request support.
+        # Support decoding based on PEM encoded request or similar, base64
+        # encoded request.  The latter is a better approach, support both forms
+        # for now until clients can be updated 
         try:
             cert_req = crypto.load_certificate_request(crypto.FILETYPE_PEM,
-                                                       pem_cert_req)
+                                                       str_cert_req)
         except crypto.Error:
-            log.error("Error loading input certificate request: %r", 
-                      pem_cert_req)
-            raise HTTPBadRequest("Error loading input certificate request")
+            # Re-try, this time interpreting the text as a base64 encoded value
+            try:
+                der_cert_req = base64.b64decode(str_cert_req)
+                cert_req = crypto.load_certificate_request(crypto.FILETYPE_ASN1,
+                                                           der_cert_req)
+            except crypto.Error:
+                log.error("Error loading input certificate request: %r", 
+                          str_cert_req)
+                raise HTTPBadRequest("Error loading input certificate request")
         
         subject_name_tmpl = string.Template(self.cert_subject_name_template)
         subject_name_str = subject_name_tmpl.substitute(**request.environ)
