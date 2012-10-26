@@ -30,6 +30,8 @@ class RepozeWhoUrlMatchFilter(object):
         optname = prefix + cls.URL_MATCH_LIST_OPTNAME
         obj.urlpath_match_list = app_conf[optname].split()
         
+        return obj
+        
     def __call__(self, environ, start_response):
         '''Set HTTP 401 Unauthorized response if no repoze.who.identity key is 
         set in environ
