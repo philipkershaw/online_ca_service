@@ -1,4 +1,4 @@
-"""MyProxy Server Utilities module
+"""Online CA Test utilities module
 """
 __author__ = "P J Kershaw"
 __date__ = "28/05/12"

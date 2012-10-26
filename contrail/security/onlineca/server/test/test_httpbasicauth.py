@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Unit tests for MyProxy WSGI Middleware classes and Application
+"""Unit tests for Online CA service configured with HTTP Basic Auth
 """
 __author__ = "P J Kershaw"
 __date__ = "21/05/10"
@@ -21,8 +21,9 @@ from contrail.security.onlineca.server.wsgi.httpbasicauth import (
 
 class TestApp(object):
     """Test WSGI Application for use with the unit tests for the HTTP Basic
-    Auth middleware developed for the myproxy.ws.server.app.MyProxyApp 
-    application
+    Auth middleware developed for the 
+    contrail.security.onlineca.server.wsgi.httpbasicauth.HttpBasicAuthMiddleware
+    middleware
     """
     def __init__(self, global_conf, **app_conf):
         """Follow standard Paste Deploy app factory function signature"""
@@ -103,7 +104,7 @@ class TestHttpBasicAuthCallBackMiddleware(object):
     
 
 class HttpBasicAuthMiddlewareTestCase(unittest.TestCase):
-    """Unit tests for HTTP Basic Auth middleware used with the MyProxyWebService
+    """Unit tests for HTTP Basic Auth middleware used with the Online CA service
     package
     """
     CONFIG_FILE = 'httpbasicauth.ini'
@@ -121,6 +122,7 @@ class HttpBasicAuthMiddlewareTestCase(unittest.TestCase):
     def test01NoHttpBasicAuthHeader(self):
         # Try with no HTTP Basic Auth HTTP header
         response = self.app.get('/auth', status=401)
+        self.assert_(response, 'Null response')
             
     def test02ValidCredentials(self):
         # Try with no HTTP Basic Auth HTTP header
@@ -170,6 +172,7 @@ class HttpBasicAuthMiddlewareTestCase(unittest.TestCase):
         headers = {'Authorization': authHeader}
         
         response = self.app.get('/auth', headers=headers, status=200)
+        self.assert_(response, 'Null response')
         
     def test05SimpleCBMiddlewareWithInvalidCredentials(self):
         self._createCallbackMiddleware()
@@ -181,5 +184,6 @@ class HttpBasicAuthMiddlewareTestCase(unittest.TestCase):
         headers = {'Authorization': authHeader}
         
         response = self.app.get('/auth', headers=headers, status=401)       
+        self.assert_(response, 'Null response')
 
     

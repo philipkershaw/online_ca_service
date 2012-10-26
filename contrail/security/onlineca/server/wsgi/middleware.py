@@ -354,9 +354,11 @@ class OnlineCaMiddleware(object):
         return cert_pem
 
     def _get_trustroots(self, request):
-        """Call getTrustRoots method on MyProxyClient instance retrieved from
-        environ and format and return a HTTP response
+        """Retrieve the set of trust roots (CA certificates and associated
+        signing policy files) needed to trust this service.
         
+        @param request: HTTP request
+        @type request: webob.Request
         @rtype: basestring
         @return: trust roots base64 encoded and concatenated together
         """
