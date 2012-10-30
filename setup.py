@@ -24,21 +24,30 @@ setup(
     version =         	'0.1.0',
     description =     	'Certificate Authority Web Service',
     long_description = 	'''\
-Provides a simple web service interface to an online CA suitable for use as a
-SLCS (Short-Lived Credential Service).
+Provides a simple web service interface to a Certificate Authority.  This is 
+suitable for use as a SLCS (Short-Lived Credential Service).
 
 The interface is implemented as a WSGI application which fronts a Certificate
-Authority.  Web service call can be made to request a certificate.  The web 
-service interface is RESTful using GET and POST operations.  The service 
-should be hosted over HTTPS.  Client authentication is configurable to the 
-required means using an WSGI-compatible filters including repoze.who.  An 
-application is included which  uses HTTP Basic Auth to pass username and 
-pass-phrase credentials
+Authority.  The Certificate Authority is implemented with the ``ContrailCA``
+package also available from PyPI.
 
-The unit tests include a test application served using paster.  Client scripts
-are also available which need no specialised installation or applications, only
-openssl and wget or curl which are typically available on Linux/UNIX based 
-systems.
+Web service call can be made to request an X.509 certificate.  The web service 
+interface is RESTful and uses GET and POST operations.  The service should be 
+hosted over HTTPS.  Client authentication is configurable to the required means 
+using any WSGI-compatible filters including repoze.who.  An application is 
+included which  uses HTTP Basic Auth to pass username/password credentials.  
+SSL client-based authentication can also be used.  A client is available with 
+the ``ContrailOnlineCAClient`` package also available from PyPI.
+
+The code has been developed for the Contrail Project, http://contrail-project.eu/
+
+Prerequisites
+=============
+This has been developed and tested for Python 2.6 and 2.7.
+
+Installation
+============
+Installation can be performed using easy_install or pip.
 
 Configuration
 =============
