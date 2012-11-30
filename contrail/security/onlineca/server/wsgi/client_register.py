@@ -35,7 +35,7 @@ class ClientRegisterMiddleware(object):
     '''
     CLIENT_REGISTER_OPT_PREFIX = 'client_register.'
     DN_SUB_OPTNAME = 'dn'
-    USERS_SUB_OPTNAME = 'users'
+    USERS_SUB_OPTNAME = 'user'
     DEFAULT_SSL_CLIENT_CERT_KEYNAME = 'SSL_CLIENT_CERT'
     SSL_CLIENT_CERT_KEYNAME_OPTNAME = 'ssl_client_cert_keyname'
     X509_DATETIME_FMT = '%Y%m%d%H%M%S%fZ'
@@ -80,9 +80,11 @@ class ClientRegisterMiddleware(object):
                     subject_name = X509SubjectName.from_string(val)
                     dn_lookup[identifier] = subject_name.serialize()
                     
-                elif sub_optname == cls.USERS_SUB_OPTNAME:
-                    users_lookup[identifier] = val.split()
-                    
+                elif sub_optname.startswith(cls.USERS_SUB_OPTNAME):
+                    if identifier in users_lookup:
+                        users_lookup[identifier].append(val)
+                    else:
+                        users_lookup[identifier] = [val]
                 else:
                     raise ClientRegisterMiddlewareConfigError(
                         '%r option name not recognised' % optname)
