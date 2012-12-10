@@ -38,6 +38,10 @@ class ClientRegisterMiddleware(object):
     USERS_SUB_OPTNAME = 'user'
     DEFAULT_SSL_CLIENT_CERT_KEYNAME = 'SSL_CLIENT_CERT'
     SSL_CLIENT_CERT_KEYNAME_OPTNAME = 'ssl_client_cert_keyname'
+    DEFAULT_USERID_KEYNAME = 'REMOTE_USER'
+    USERID_KEYNAME_OPTNAME = 'userid_keyname'
+    DEFAULT_PATH_MATCH_LIST = None
+    PATH_MATCH_LIST_OPTNAME = 'path_match_list'
     X509_DATETIME_FMT = '%Y%m%d%H%M%S%fZ'
     
     def __init__(self, app):
@@ -45,10 +49,26 @@ class ClientRegisterMiddleware(object):
         self.client_register = {}
         self.ssl_client_cert_keyname = \
             self.__class__.DEFAULT_SSL_CLIENT_CERT_KEYNAME
-        
+        self.userid_keyname = self.__class__.DEFAULT_USERID_KEYNAME
+        self.__path_match_list = self.__class__.DEFAULT_PATH_MATCH_LIST
+    
+    @property
+    def path_match_list(self):
+        return self.__path_match_list
+    
+    @path_match_list.setter
+    def path_match_list(self, val):
+        if isinstance(val, basestring):
+            self.__path_match_list = val.split()
+        elif isinstance(val, (list, tuple)):
+            self.__path_match_list = tuple(val)
+        else:
+            raise TypeError('Expecting list, tuple or string type for '
+                            '"path_match_list"; got %r type instead' % type(val))
+            
     @classmethod
     def filter_app_factory(cls, app, global_conf, 
-                           prefix=CLIENT_REGISTER_OPT_PREFIX,
+                           prefix='',
                            **app_conf):
         obj = cls(app)
         
@@ -56,9 +76,9 @@ class ClientRegisterMiddleware(object):
         # the usernames for which they can get a delegation e.g.
         # 
         # client_register.0.dn = /O=NDG/OU=Security/CN=delegatee.somewhere.ac.uk
-        # client_register.0.users = another jbloggs jdoe
+        # client_register.0.user0 = another jbloggs jdoe
         # client_register.1.dn = /O=STFC/OU=CEDA/CN=delegatee.ceda.ac.uk
-        # client_register.1.users = asmith 
+        # client_register.1.user_1 = asmith 
         # 
         # would result in:
         #
@@ -66,10 +86,11 @@ class ClientRegisterMiddleware(object):
         #                    ['another', 'jbloggs', 'jdoe'],
         #                   '/O=STFC/OU=CEDA/CN=delegatee.ceda.ac.uk':
         #                    ['asmith']}
+        client_register_opt_prefix = prefix + cls.CLIENT_REGISTER_OPT_PREFIX
         dn_lookup = {}
         users_lookup = {}
         for optname, val in app_conf.items():
-            if optname.startswith(prefix):
+            if optname.startswith(client_register_opt_prefix):
                 identifier, sub_optname = optname.split('.')[-2:]
                                     
                 if sub_optname == cls.DN_SUB_OPTNAME:
@@ -100,14 +121,29 @@ class ClientRegisterMiddleware(object):
         if ssl_client_cert_keyname_optname in app_conf:
             obj.ssl_client_cert_keyname = app_conf[
                                                 ssl_client_cert_keyname_optname]
-        
+            
+        userid_keyname_optname = prefix + cls.USERID_KEYNAME_OPTNAME
+        if userid_keyname_optname in app_conf:
+            obj.userid_keyname = app_conf[userid_keyname_optname]
+            
+        path_match_list_optname = prefix + cls.PATH_MATCH_LIST_OPTNAME
+        if path_match_list_optname in app_conf:
+            obj.path_match_list = app_conf[path_match_list_optname]
+       
         return obj
         
     def __call__(self, environ, start_response):
         '''Get client cert used in SSL handshake + username passed in HTTP
         Basic Auth and apply client register to verify the request
         '''
+        # Apply register only to URL paths in the path match list.  Ignore if
+        # no list is set
+        if (self.path_match_list is not None and
+            environ['PATH_INFO'] not in self.path_match_list):
+            return self.app(environ, start_response)
+        
         username = HttpBasicAuthMiddleware.parse_credentials(environ)[0]
+        environ[self.userid_keyname] = username
         cert = self._parse_cert(environ)
         if (cert is not None and 
             self.is_valid_client_cert(cert) and
@@ -115,12 +151,14 @@ class ClientRegisterMiddleware(object):
             
             return self.app(environ, start_response)
         else:
-            raise HTTPUnauthorized()
+            return HTTPUnauthorized()(environ, start_response)
         
     def _parse_cert(self, environ):
         '''Parse client certificate from environ'''
         pem_cert = environ.get(self.ssl_client_cert_keyname)
-        if pem_cert is None:
+        
+        # Cert may resolve to null or None
+        if not pem_cert:
             return None
         
         cert = crypto.load_certificate(crypto.FILETYPE_PEM, pem_cert)
@@ -147,7 +185,10 @@ class ClientRegisterMiddleware(object):
         TODO: allow verification against CA certs - current assumption is 
         that Apache config performs this task!
         '''
-        return not cls._is_cert_expired(cert)
+        if not cert:
+            return False
+        else:
+            return not cls._is_cert_expired(cert)
     
     def in_client_register(self, cert, username):
         '''Check client identity against registry'''
@@ -159,12 +200,12 @@ class ClientRegisterMiddleware(object):
         if dn not in self.client_register:
             log.info('Client certificate DN %r not found in client register',
                      dn)
-            raise HTTPUnauthorized()
+            return False
         
         if username not in self.client_register[dn]:
             log.info('No match for user %r and client certificate DN %r '
                      'in client register', username, dn)            
-            raise HTTPUnauthorized()
+            return False
         
         return True
         

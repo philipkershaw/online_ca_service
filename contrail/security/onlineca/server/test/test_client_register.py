@@ -38,9 +38,15 @@ class TestApp(object):
         against.  If this method is executed then the HTTP Basic Auth step in
         the upstream middleware has succeeded.
         """
+        if environ['PATH_INFO'] == '/certificate/':
+            response = 'Authenticated!'
+            status = '200 OK'
+        else:
+            response = 'Not found'
+            status = '404 Not Found'
+            
         contentType = 'text/plain'
-        response = 'Authenticated!'
-        status = '200 OK'
+            
         start_response(status,
                        [('Content-type', contentType),
                         ('Content-Length', str(len(response)))])
@@ -68,7 +74,7 @@ class TestClientRegisterMiddleware(unittest.TestCase):
 
         environ = {ClientRegisterMiddleware.DEFAULT_SSL_CLIENT_CERT_KEYNAME: 
                    self.__class__.CLIENT_CERT}
-        response = self.app.get('/', status=200, headers=headers,
+        response = self.app.get('/certificate/', status=200, headers=headers,
                                 extra_environ=environ)
         log.debug(response)
         
@@ -81,8 +87,8 @@ class TestClientRegisterMiddleware(unittest.TestCase):
 
         environ = {ClientRegisterMiddleware.DEFAULT_SSL_CLIENT_CERT_KEYNAME: 
                    self.__class__.INVALID_CLIENT_CERT}
-        self.assertRaises(HTTPUnauthorized, self.app.get, '/', status=401, 
-                          headers=headers, extra_environ=environ)
+        self.app.get('/certificate/', status=401, headers=headers, 
+                     extra_environ=environ)
         
     def test03_invalid_client(self):
         username = 'an_other'
@@ -93,8 +99,8 @@ class TestClientRegisterMiddleware(unittest.TestCase):
 
         environ = {ClientRegisterMiddleware.DEFAULT_SSL_CLIENT_CERT_KEYNAME: 
                    self.__class__.INVALID_CLIENT_CERT}
-        self.assertRaises(HTTPUnauthorized, self.app.get, '/', status=401, 
-                          headers=headers, extra_environ=environ)
+        self.app.get('/certificate/', status=401, headers=headers, 
+                     extra_environ=environ)
             
     def test04_valid_username(self):
         username = 'asmith'
@@ -105,6 +111,18 @@ class TestClientRegisterMiddleware(unittest.TestCase):
 
         environ = {ClientRegisterMiddleware.DEFAULT_SSL_CLIENT_CERT_KEYNAME: 
                    self.__class__.CLIENT_CERT}
-        self.assertRaises(HTTPUnauthorized, self.app.get, '/', status=401, 
-                          headers=headers, extra_environ=environ)
+        self.app.get('/certificate/', status=401, headers=headers, 
+                     extra_environ=environ)
+        
+    def test05_unsecured_path(self):
+        username = 'asmith'
+        password = ''
+        base64string = base64.encodestring('%s:%s' % (username, password))[:-1]
+        auth_header =  "Basic %s" % base64string
+        headers = {'Authorization': auth_header}
+
+        environ = {ClientRegisterMiddleware.DEFAULT_SSL_CLIENT_CERT_KEYNAME: 
+                   self.__class__.INVALID_CLIENT_CERT}
+        self.app.get('/', status=404, headers=headers, 
+                     extra_environ=environ)
 
