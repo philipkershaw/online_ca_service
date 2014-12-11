@@ -107,7 +107,7 @@ class HttpBasicAuthMiddleware(object):
     FIELD_SEP = ':'
     AUTHZ_ENV_KEYNAME = 'HTTP_AUTHORIZATION'
     
-    AUTHN_HDR_FORMAT = '%s ' + REALM_OPTNAME + '="%s"' 
+    AUTHN_HDR_FORMAT = '%s ' + REALM_OPTNAME + '="%s"'
     
     __slots__ = (
         '__rePathMatchList', 
@@ -327,7 +327,7 @@ class HttpBasicAuthMiddleware(object):
                 if not authn_realm_hdrFound:
                     # Nb. realm requires double quotes according to RFC
                     authn_realm_hdr = (self.__class__.AUTHENTICATE_HDR_FIELDNAME,
-                                     self.__class__.AUTHN_HDR_FORMAT % (                                   
+                                     self.__class__.AUTHN_HDR_FORMAT % (
                                      self.__class__.AUTHN_SCHEME_HDR_FIELDNAME,
                                      self.realm))
                     headers.append(authn_realm_hdr)
